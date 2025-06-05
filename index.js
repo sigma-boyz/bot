@@ -78,7 +78,7 @@ function createBot() {
       });
     });
   }
-  bot.on("chat",(username,message)) =>{
+  bot.on("chat",(username,message) =>{
     if(message === "quit"){
       if(!reconnecting){
         reconnecting = true
@@ -91,7 +91,7 @@ function createBot() {
           console.log("BOT reconnected")
         },20000)}
     }
-  }
+  })
   bot.once('spawn', () => {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
 
