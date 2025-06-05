@@ -171,7 +171,9 @@ function createBot() {
     }
   });
 bot.on("chat",(username,message) =>{
+  console.log(message)
     if(message === "quit"){
+  
       console.log("quitting")
       if(!reconnecting){
         reconnecting = true
