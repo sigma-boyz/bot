@@ -76,17 +76,7 @@ function createBot() {
       });
     });
   }
-  bot.on("chat",(username,message) =>{
-    if(message === "quit"){
-      console.log("quitting")
-      if(!reconnecting){
-        reconnecting = true
-        quitting = true
-        bot.quit()
-        console.log("bot quit")
   
-    }
-  })
   bot.once('spawn', () => {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
     reconnecting = false
@@ -180,7 +170,17 @@ function createBot() {
       moveRandomly();
     }
   });
-
+bot.on("chat",(username,message) =>{
+    if(message === "quit"){
+      console.log("quitting")
+      if(!reconnecting){
+        reconnecting = true
+        quitting = true
+        bot.quit()
+        console.log("bot quit")
+  
+    }
+  })
   bot.on('goal_reached', () => {
     console.log(
       `\x1b[32m[AfkBot] Bot arrived at the target location. ${bot.entity.position}\x1b[0m`
