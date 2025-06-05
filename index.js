@@ -18,8 +18,6 @@ app.listen(8000, () => {
 let reconnecting = false
 let quitting = false
 function createBot() {
-  reconnecting = false
-  quitting = false
   const bot = mineflayer.createBot({
     username: config['bot-account']['username'],
     password: config['bot-account']['password'],
@@ -95,7 +93,8 @@ function createBot() {
   })
   bot.once('spawn', () => {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
-
+    reconnecting = false
+  quitting = false
     bot.pathfinder.setMovements(defaultMove);
 
     if (config.utils['auto-auth'].enabled) {
