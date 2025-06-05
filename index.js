@@ -15,8 +15,11 @@ app.get('/', (req, res) => {
 app.listen(8000, () => {
   console.log('Server started');
 });
-
+let reconnecting = false
+let quitting = false
 function createBot() {
+  reconnecting = false
+  quitting = false
   const bot = mineflayer.createBot({
     username: config['bot-account']['username'],
     password: config['bot-account']['password'],
@@ -75,7 +78,20 @@ function createBot() {
       });
     });
   }
-
+  bot.on("chat",(username,message) =>{
+    if(message === "quit"){
+      if(!reconnecting){
+        reconnecting = true
+        quitting = true
+        bot.quit()
+        console.log("bot quit")
+  
+        setTimeout(() =>{
+          createBot()
+          console.log("BOT reconnected")
+        },20000)}
+    }
+  }
   bot.once('spawn', () => {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
 
@@ -183,9 +199,12 @@ function createBot() {
 
   if (config.utils['auto-reconnect']) {
     bot.on('end', () => {
-      setTimeout(() => {
-        createBot();
-      }, config.utils['auto-reconnect-delay']);
+      if(!reconnecting && !quitting){
+        reconnecting = true
+        setTimeout(() => {
+          createBot();
+        }, config.utils['auto-reconnect-delay']);
+      }
     });
   }
 
