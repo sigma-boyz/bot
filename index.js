@@ -91,6 +91,22 @@ function createBot() {
             .then(() => sendLogin(password))
             .catch(error => console.error('[ERROR]', error));
       }
+       if (config["movement-area"].enabled) {
+           const center = config["movement-area"].center;
+           const range = config["movement-area"].range;
+           const interval = config["movement-area"].interval;
+        
+           setInterval(() => {
+              const offsetX = Math.floor(Math.random() * (range * 2 + 1)) - range;
+              const offsetZ = Math.floor(Math.random() * (range * 2 + 1)) - range;
+              const goalX = center.x + offsetX;
+              const goalY = center.y;
+              const goalZ = center.z + offsetZ;
+        
+              console.log(`[Movement] Moving to (${goalX}, ${goalY}, ${goalZ})`);
+              bot.pathfinder.setGoal(new GoalBlock(goalX, goalY, goalZ));
+           }, interval * 1000);
+        }
 
       if (config.utils['chat-messages'].enabled) {
          console.log('[INFO] Started chat-messages module');
