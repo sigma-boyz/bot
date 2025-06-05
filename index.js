@@ -1,4 +1,4 @@
-cost mineflayer = require('mineflayer');
+const mineflayer = require('mineflayer');
 const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
