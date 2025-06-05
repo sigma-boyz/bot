@@ -1,4 +1,4 @@
-cost mineflayer = require('mineflayer');
+const mineflayer = require('mineflayer');
 const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
@@ -77,6 +77,20 @@ function createBot() {
          });
       });
    }
+   bot.on('chat', (username, message) => {
+  if (username === bot.username) return;
+
+  if (message() === 'leaveBOT') {
+    console.log(`[Command] Received 'leaveBOT' from ${username}. Leaving and will rejoin in 30s.`);
+    bot.quit();
+    BOT = null;
+
+    setTimeout(() => {
+      createBot();
+      console.log('[Logic] Rejoining the server after leaveBOT command.');
+    }, 20000); 
+  }
+});
 
    bot.once('spawn', () => {
       console.log('\x1b[33m[AfkBot] Bot joined the server', '\x1b[0m');
