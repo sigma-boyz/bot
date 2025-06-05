@@ -85,10 +85,6 @@ function createBot() {
         bot.quit()
         console.log("bot quit")
   
-        setTimeout(() =>{
-          createBot()
-          console.log("BOT reconnected")
-        },20000)}
     }
   })
   bot.once('spawn', () => {
@@ -199,12 +195,11 @@ function createBot() {
 
   if (config.utils['auto-reconnect']) {
     bot.on('end', () => {
-      if(!reconnecting && !quitting){
-        reconnecting = true
-        setTimeout(() => {
-          createBot();
-        }, config.utils['auto-reconnect-delay']);
-      }
+      
+        setTimeout(() =>{
+          createBot()
+          console.log("BOT reconnected")
+        },20000)}
     });
   }
 
