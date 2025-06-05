@@ -193,15 +193,15 @@ bot.on("chat",(username,message) =>{
     );
   });
 
-  if (config.utils['auto-reconnect']) {
-    bot.on('end', () => {
-      
-        setTimeout(() =>{
-          createBot()
-          console.log("BOT reconnected")
-        },20000)}
-    });
-  }
+ if (config.utils['auto-reconnect']) {
+  bot.on('end', () => {
+    setTimeout(() => {
+      createBot();
+      console.log("BOT reconnected");
+    }, 20000);
+  });
+}
+
 
   bot.on('kicked', (reason) =>
     console.log(
