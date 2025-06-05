@@ -80,7 +80,7 @@ function createBot() {
    bot.on('chat', (username, message) => {
   if (username === bot.username) return;
 
-  if (message() === 'leaveBOT') {
+  if (message === 'leaveBOT') {
     console.log(`[Command] Received 'leaveBOT' from ${username}. Leaving and will rejoin in 30s.`);
     bot.quit();
     BOT = null;
