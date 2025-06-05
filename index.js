@@ -181,7 +181,7 @@ function createBot() {
       bot.on('end', () => {
          setTimeout(() => {
             createBot();
-         }, config.utils['auto-recconect-delay']);
+         }, config.utils['auto-reconnect-delay']);
       });
    }
 
