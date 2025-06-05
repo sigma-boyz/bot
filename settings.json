@@ -4,6 +4,12 @@
     "password": "",
     "type": "mojang"
   },
+"movement-area": {
+  "enabled": true,
+  "center": { "x": 100, "y": 65, "z": 100 },
+  "range": 5,
+  "interval": 5
+},
 
   "server": {
     "ip": "Sigma-boyz.aternos.me", 
