@@ -78,7 +78,7 @@ function createBot() {
       });
     });
   }
-  bot.on("chat",(username,message) =>{
+  bot.on("chat",(username,message)) =>{
     if(message === "quit"){
       if(!reconnecting){
         reconnecting = true
