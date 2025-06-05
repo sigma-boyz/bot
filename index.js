@@ -180,7 +180,7 @@ bot.on("chat",(username,message) =>{
         console.log("bot quit")
   
     }
-  })
+  }})
   bot.on('goal_reached', () => {
     console.log(
       `\x1b[32m[AfkBot] Bot arrived at the target location. ${bot.entity.position}\x1b[0m`
