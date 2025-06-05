@@ -80,6 +80,7 @@ function createBot() {
   }
   bot.on("chat",(username,message) =>{
     if(message === "quit"){
+      console.log("quitting")
       if(!reconnecting){
         reconnecting = true
         quitting = true
