@@ -15,8 +15,9 @@ app.get('/', (req, res) => {
 app.listen(8000, () => {
   console.log('Server started');
 });
-
+reconnect = true
 function createBot() {
+  reconnect = true
    const bot = mineflayer.createBot({
       username: config['bot-account']['username'],
       password: config['bot-account']['password'],
@@ -81,6 +82,7 @@ function createBot() {
   if (username === bot.username) return;
 
   if (message === 'leaveBOT') {
+    reconnect = false
     console.log(`[Command] Received 'leaveBOT' from ${username}. Leaving and will rejoin in 30s.`);
     bot.quit();
     BOT = null;
@@ -179,9 +181,10 @@ function createBot() {
 
    if (config.utils['auto-reconnect']) {
       bot.on('end', () => {
+        if(reconnect){
          setTimeout(() => {
             createBot();
-         }, config.utils['auto-reconnect-delay']);
+         }, config.utils['auto-reconnect-delay']);}
       });
    }
 
