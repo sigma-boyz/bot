@@ -14,11 +14,12 @@ const port = 37216;
 let BOT = null
 let realPlayerDetected = false;
 let lastPlayerCount = 0;
-
+let playeronline 
 function checkPlayers() {
   status(host, port, { timeout: 5000, enableSRV: true })
     .then(response => {
       const online = response.players.online;
+      playeronline = online
       console.log(`[${new Date().toLocaleTimeString()}] Players Online: ${online}`);
 
       if (online > 1) {
@@ -239,7 +240,7 @@ bot.on("chat",(username,message) =>{
 
  if (config.utils['auto-reconnect']) {
   bot.on('end', () => {
-    if(!realPlayerDetected && online === 0){
+    if(!realPlayerDetected && playeronline === 0){
     setTimeout(() => {
       createBot();
       console.log("BOT reconnected");
