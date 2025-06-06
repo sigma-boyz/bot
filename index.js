@@ -240,7 +240,7 @@ bot.on("chat",(username,message) =>{
 
  if (config.utils['auto-reconnect']) {
   bot.on('end', () => {
-    if(!realPlayerDetected && playeronline === 0){
+    if(!realPlayerDetected){
     setTimeout(() => {
       createBot();
       console.log("BOT reconnected");
