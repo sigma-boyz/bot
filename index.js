@@ -2,11 +2,51 @@ const mineflayer = require('mineflayer');
 const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
+const { status } = require('minecraft-server-util');
 
 const config = require('./settings.json');
 const express = require('express');
 
 const app = express();
+
+const host = 'Sigma-boyz.aternos.me';
+const port = 37216;
+let BOT = null
+let realPlayerDetected = false;
+let lastPlayerCount = 0;
+
+function checkPlayers() {
+  status(host, port, { timeout: 5000, enableSRV: true })
+    .then(response => {
+      const online = response.players.online;
+      console.log(`[${new Date().toLocaleTimeString()}] Players Online: ${online}`);
+
+      if (online > 1) {
+        realPlayerDetected = true;
+      }
+
+      if (BOT && realPlayerDetected && online === 2) {
+        console.log('[INFO] Real player joined. Quitting bot...');
+        BOT.quit();
+        BOT = null;
+        return;
+      }
+
+      if (!BOT && online === 0) {
+        console.log('[INFO] No players. Starting bot...');
+        createBot();
+        realPlayerDetected = false;
+        return;
+      }
+
+      if (BOT) {
+        console.log('[INFO] Bot running.');
+      }
+    })
+    .catch(err => {
+      console.error('Status check error:', err.message);
+    });
+}
 
 app.get('/', (req, res) => {
   res.send('Bot has arrived');
@@ -26,7 +66,7 @@ function createBot() {
     port: config.server.port,
     version: config.server.version,
   });
-
+  
   bot.loadPlugin(pathfinder);
   const mcData = require('minecraft-data')(bot.version);
   const defaultMove = new Movements(bot, mcData);
@@ -81,8 +121,10 @@ function createBot() {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
     reconnecting = false
   quitting = false
-    bot.pathfinder.setMovements(defaultMove);
-
+  BOT = bot
+  console.log("bot joined")
+  bot.pathfinder.setMovements(defaultMove);
+  
     if (config.utils['auto-auth'].enabled) {
       console.log('[INFO] Started auto-auth module');
 
@@ -197,10 +239,11 @@ bot.on("chat",(username,message) =>{
 
  if (config.utils['auto-reconnect']) {
   bot.on('end', () => {
+    if(!realPlayerDetected && online === 0){
     setTimeout(() => {
       createBot();
       console.log("BOT reconnected");
-    }, 20000);
+    }, 20000);}
   });
 }
 
@@ -218,4 +261,5 @@ bot.on("chat",(username,message) =>{
   );
 }
 
-createBot();
+setInterval(checkPlayers, 2000);
+checkPlayers();
