@@ -193,16 +193,20 @@ function createBot() {
       }
 
       function getSafeY(x, z) {
+        try{
   for (let y = 256; y > 0; y--) {
     const block = bot.blockAt(new Vec3(x, y, z)); 
     if (block && block.boundingBox !== 'empty') {
       return y + 1;
     }
+  }catch(err){ 
+  }
   }
   return center.y;
 }
 
       function moveRandomly() {
+        try{
         const x = getRandomInt(center.x - range, center.x + range);
         const z = getRandomInt(center.z - range, center.z + range);
         const y = getSafeY(x, z);
@@ -211,6 +215,9 @@ function createBot() {
         bot.pathfinder.setGoal(new GoalBlock(x, y, z));
 
         setTimeout(moveRandomly, interval);
+        }catch(error){
+          setTimeout(moveRandomly, interval);
+        }
       }
 
       moveRandomly();
