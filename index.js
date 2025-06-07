@@ -1,4 +1,5 @@
 const mineflayer = require('mineflayer');
+const Vec3 = require('vec3');
 const Movements = require('mineflayer-pathfinder').Movements;
 const pathfinder = require('mineflayer-pathfinder').pathfinder;
 const { GoalBlock } = require('mineflayer-pathfinder').goals;
@@ -192,15 +193,14 @@ function createBot() {
       }
 
       function getSafeY(x, z) {
-        // Start from max height going down to find solid block
-        for (let y = 256; y > 0; y--) {
-          const block = bot.blockAt({ x, y, z });
-          if (block && block.boundingBox !== 'empty') {
-            return y + 1; // one block above ground
-          }
-        }
-        return center.y; // fallback
-      }
+  for (let y = 256; y > 0; y--) {
+    const block = bot.blockAt(new Vec3(x, y, z)); 
+    if (block && block.boundingBox !== 'empty') {
+      return y + 1;
+    }
+  }
+  return center.y;
+}
 
       function moveRandomly() {
         const x = getRandomInt(center.x - range, center.x + range);
