@@ -14,8 +14,9 @@ const port = 37216;
 let BOT = null
 let realPlayerDetected = false;
 let lastPlayerCount = 0;
-let playeronline 
+let botjoining = false 
 function checkPlayers() {
+  if(botjoining)return
   status(host, port, { timeout: 5000, enableSRV: true })
     .then(response => {
       const online = response.players.online;
@@ -35,6 +36,7 @@ function checkPlayers() {
 
       if (!BOT && online === 0) {
         console.log('[INFO] No players. Starting bot...');
+        botjoining = true
         createBot();
         realPlayerDetected = false;
         return;
@@ -120,6 +122,7 @@ function createBot() {
   
   bot.once('spawn', () => {
     console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
+    botjoining = false
     reconnecting = false
   quitting = false
   BOT = bot
@@ -241,6 +244,7 @@ bot.on("chat",(username,message) =>{
  if (config.utils['auto-reconnect']) {
   bot.on('end', () => {
     if(!realPlayerDetected){
+botjoining = false
     setTimeout(() => {
       createBot();
       console.log("BOT reconnected");
