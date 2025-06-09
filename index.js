@@ -183,7 +183,7 @@ function createBot() {
               const x = getRandomInt(center.x - range, center.x + range);
               const z = getRandomInt(center.z - range, center.z + range);
               const y = getSafeY(x, z);
-              console.log(`[INFO] Wandering to (${x}, ${y}, ${z})`);
+     
               bot.pathfinder.setGoal(new GoalBlock(x, y, z));
             } catch (err) {
               console.error(`[Wander Error] ${err.message}`);
@@ -246,3 +246,32 @@ function createBot() {
 
 setInterval(checkPlayers, 2000);
 checkPlayers();
+let lastPosition = null;
+let samePositionSince = null;
+
+setInterval(() => {
+  if (!BOT || !BOT.entity || !BOT.entity.position) return;
+
+  const currentPos = BOT.entity.position;
+
+  if (!lastPosition) {
+    lastPosition = currentPos.clone();
+    samePositionSince = Date.now();
+    return;
+  }
+
+  const dist = currentPos.distanceTo(lastPosition);
+
+  if (dist < 0.1) {
+    const stuckDuration = (Date.now() - samePositionSince) / 1000;
+    if (stuckDuration >= 10) {
+      console.log('[STUCK DETECTED] Bot is stuck for more than 10 seconds.');
+      BOT.chat('/kill'); 
+      samePositionSince = Date.now(); 
+    }
+  } else {
+    lastPosition = currentPos.clone();
+    samePositionSince = Date.now();
+  }
+}, 1000); 
+
