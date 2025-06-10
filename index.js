@@ -8,7 +8,7 @@ const app = express();
 
 const host = 'Sigma-boyz.aternos.me';
 const port = 37216;
-
+let botleft = 0
 let BOT = null;
 let realPlayerDetected = false;
 let botjoining = false;
@@ -64,43 +64,33 @@ function createBot() {
 
     async function sendRegister(password) {
       return new Promise((resolve, reject) => {
-        try {
-          bot.chat(`/register ${password} ${password}`);
-          console.log(`[Auth] Sent /register`);
-          bot.once('chat', (username, message) => {
-            console.log(`[ChatLog] <${username}> ${message}`);
-            if (message.includes('successfully registered') || message.includes('already registered')) return resolve();
-            reject(`Registration failed: "${message}"`);
-          });
-        } catch (err) {
-          reject(`Registration crash: ${err.message}`);
-        }
+        bot.chat(`/register ${password} ${password}`);
+        console.log(`[Auth] Sent /register`);
+        bot.once('chat', (username, message) => {
+          if (message.includes('successfully registered') || message.includes('already registered')) return resolve();
+          reject(`Registration failed: "${message}"`);
+        });
       });
     }
 
     async function sendLogin(password) {
       return new Promise((resolve, reject) => {
-        try {
-          bot.chat(`/login ${password}`);
-          console.log(`[Auth] Sent /login`);
-          bot.once('chat', (username, message) => {
-            console.log(`[ChatLog] <${username}> ${message}`);
-            if (message.includes('successfully logged in')) return resolve();
-            reject(`Login failed: "${message}"`);
-          });
-        } catch (err) {
-          reject(`Login crash: ${err.message}`);
-        }
+        bot.chat(`/login ${password}`);
+        console.log(`[Auth] Sent /login`);
+        bot.once('chat', (username, message) => {
+          if (message.includes('successfully logged in')) return resolve();
+          reject(`Login failed: "${message}"`);
+        });
       });
     }
 
     bot.once('spawn', () => {
       console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
       botjoining = false;
+      botleft = 0
       reconnecting = false;
       quitting = false;
       BOT = bot;
-
       bot.pathfinder.setMovements(defaultMove);
 
       if (config.utils['auto-auth'].enabled) {
@@ -117,12 +107,8 @@ function createBot() {
           const delay = config.utils['chat-messages']['repeat-delay'];
           let i = 0;
           setInterval(() => {
-            try {
-              bot.chat(messages[i]);
-              i = (i + 1) % messages.length;
-            } catch (err) {
-              console.error(`[Chat Msg Error] ${err.message}`);
-            }
+            bot.chat(messages[i]);
+            i = (i + 1) % messages.length;
           }, delay * 1000);
         } else {
           messages.forEach(msg => bot.chat(msg));
@@ -159,25 +145,18 @@ function createBot() {
 
         function getSafeY(x, z) {
           for (let y = 256; y > 0; y--) {
-            try {
-              const block = bot.blockAt(new Vec3(x, y, z));
-              if (block && block.boundingBox !== 'empty') return y + 1;
-            } catch (err) {}
+            const block = bot.blockAt(new Vec3(x, y, z));
+            if (block && block.boundingBox !== 'empty') return y + 1;
           }
           return center.y;
         }
 
         function moveRandomly() {
-          try {
-            const x = getRandomInt(center.x - range, center.x + range);
-            const z = getRandomInt(center.z - range, center.z + range);
-            const y = getSafeY(x, z);
-            bot.pathfinder.setGoal(new GoalBlock(x, y, z));
-          } catch (err) {
-            console.error(`[Wander Error] ${err.message}`);
-          } finally {
-            setTimeout(moveRandomly, interval);
-          }
+          const x = getRandomInt(center.x - range, center.x + range);
+          const z = getRandomInt(center.z - range, center.z + range);
+          const y = getSafeY(x, z);
+          bot.pathfinder.setGoal(new GoalBlock(x, y, z));
+          setTimeout(moveRandomly, interval);
         }
 
         moveRandomly();
@@ -185,17 +164,20 @@ function createBot() {
     });
 
     bot.on('chat', (username, message) => {
-      try {
-        if (message === 'quit' && !reconnecting) {
-          reconnecting = true;
-          quitting = true;
-          console.log('[INFO] Quit command received. Quitting...');
-          bot.quit();
-        }
-      } catch (err) {
-        console.error(`[Chat Command Error] ${err.message}`);
+      if (message === 'quit' && !reconnecting) {
+        reconnecting = true;
+        quitting = true;
+        console.log('[INFO] Quit command received. Quitting...');
+        bot.quit();
       }
     });
+    bot.dig = async () => {
+      return Promise.reject(new Error('Digging is disabled'));
+    };
+
+    bot.placeBlock = async () => {
+      return Promise.reject(new Error('Placing blocks is disabled'));
+    };
 
     bot.on('goal_reached', () => {
       console.log(`[AfkBot] Reached destination: ${bot.entity.position}`);
@@ -207,6 +189,7 @@ function createBot() {
 
     if (config.utils['auto-reconnect']) {
       bot.on('end', () => {
+        botleft = Date.now();
         if (!realPlayerDetected) {
           botjoining = false;
           setTimeout(() => {
@@ -220,7 +203,7 @@ function createBot() {
     bot.on('kicked', reason => {
       console.log(`[AfkBot] Bot was kicked. Reason: ${reason}`);
     });
-
+    
     bot.on('error', err => {
       console.error(`[ERROR] ${err.message}`);
     });
@@ -256,3 +239,4 @@ setInterval(() => {
     samePositionSince = Date.now();
   }
 }, 1000);
+
