@@ -34,8 +34,11 @@ function checkPlayers() {
         }
         if (!BOT && online === 0) {
           console.log('[INFO] No players. Starting bot...');
-          botjoining = true;
-          createBot();
+          setTimeout(() => {
+            botjoining = true
+            createBot();
+          }, 23000);
+          
           realPlayerDetected = false;
         }
         if (BOT) console.log('[INFO] Bot running.');
