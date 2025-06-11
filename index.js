@@ -6,42 +6,50 @@ const { Vec3 } = require('vec3');
 const config = require('./settings.json');
 const app = express();
 
-const host = 'Sigma-boyz.aternos.me';
-const port = 37216;
-let botleft = 0
-let BOT = null;
-let realPlayerDetected = false;
-let botjoining = false;
-let reconnecting = false;
-let quitting = false;
+const host = config.server.ip;
+const port = config.server.port;
 
-app.get('/', (req, res) => res.send('Bot has arrived'));
-app.listen(8000, () => console.log('Server started'));
+let bots = [null, null];
+let botJoining = [false, false];
+let reconnecting = [false, false];
+let quitting = [false, false];
+let botleft = [0, 0];
+let realPlayerDetected = false;
+
+app.get('/', (req, res) => res.send('Bots are running'));
+app.listen(8000, () => console.log('Web server started on port 8000'));
 
 function checkPlayers() {
-  if (botjoining) return;
+  if (botJoining.includes(true)) return;
+
   try {
     status(host, port, { timeout: 5000, enableSRV: true })
       .then(response => {
         const online = response.players.online;
         console.log(`[${new Date().toLocaleTimeString()}] Players Online: ${online}`);
-        if (online > 1) realPlayerDetected = true;
-        if (BOT && realPlayerDetected && online === 2) {
-          console.log('[INFO] Real player joined. Quitting bot...');
-          BOT.quit();
-          BOT = null;
+
+        if (online > 2) realPlayerDetected = true;
+
+        if (bots.some(b => b) && realPlayerDetected && online === 3) {
+          console.log('[INFO] Real player joined. Quitting bots...');
+          bots.forEach((bot, i) => {
+            if (bot) {
+              bot.quit();
+              bots[i] = null;
+            }
+          });
           return;
         }
-        if (!BOT && online === 0) {
-          console.log('[INFO] No players. Starting bot...');
-          setTimeout(() => {
-            botjoining = true
-            createBot();
-          }, 23000);
-          
+
+        if (bots.every(b => b === null) && online === 0) {
+          console.log('[INFO] No players online. Starting bots...');
+          botJoining = [true, true];
           realPlayerDetected = false;
+          setTimeout(() => createBot(0), 5000);
+          setTimeout(() => createBot(1), 10000);
         }
-        if (BOT) console.log('[INFO] Bot running.');
+
+        if (bots.some(b => b)) console.log('[INFO] Bots are active.');
       })
       .catch(err => console.error('Status check error:', err.message));
   } catch (err) {
@@ -49,26 +57,34 @@ function checkPlayers() {
   }
 }
 
-function createBot() {
+function createBot(index) {
   try {
+    const botConfig = config['bot-accounts'][index];
+
     const bot = mineflayer.createBot({
-      username: config['bot-account']['username'],
-      password: config['bot-account']['password'],
-      auth: config['bot-account']['type'],
-      host: config.server.ip,
-      port: config.server.port,
+      username: botConfig.username,
+      password: botConfig.password,
+      auth: botConfig.type,
+      host,
+      port,
       version: config.server.version,
     });
+
+    bots[index] = bot;
+    botJoining[index] = false;
+    reconnecting[index] = false;
+    quitting[index] = false;
 
     bot.loadPlugin(pathfinder);
     const mcData = require('minecraft-data')(bot.version);
     const defaultMove = new Movements(bot, mcData);
+    bot.pathfinder.setMovements(defaultMove);
     let pendingPromise = Promise.resolve();
 
     async function sendRegister(password) {
       return new Promise((resolve, reject) => {
         bot.chat(`/register ${password} ${password}`);
-        console.log(`[Auth] Sent /register`);
+        console.log(`[Bot${index}] Sent /register`);
         bot.once('chat', (username, message) => {
           if (message.includes('successfully registered') || message.includes('already registered')) return resolve();
           reject(`Registration failed: "${message}"`);
@@ -79,7 +95,7 @@ function createBot() {
     async function sendLogin(password) {
       return new Promise((resolve, reject) => {
         bot.chat(`/login ${password}`);
-        console.log(`[Auth] Sent /login`);
+        console.log(`[Bot${index}] Sent /login`);
         bot.once('chat', (username, message) => {
           if (message.includes('successfully logged in')) return resolve();
           reject(`Login failed: "${message}"`);
@@ -88,13 +104,8 @@ function createBot() {
     }
 
     bot.once('spawn', () => {
-      console.log('\x1b[33m[AfkBot] Bot joined the server\x1b[0m');
-      botjoining = false;
-      botleft = 0
-      reconnecting = false;
-      quitting = false;
-      BOT = bot;
-      bot.pathfinder.setMovements(defaultMove);
+      console.log(`\x1b[33m[Bot${index}] Joined the server\x1b[0m`);
+      botleft[index] = 0;
 
       if (config.utils['auto-auth'].enabled) {
         const password = config.utils['auto-auth'].password;
@@ -119,9 +130,9 @@ function createBot() {
       }
 
       if (config.position.enabled) {
+        const offset = index * 2; // to separate bot positions
         const pos = config.position;
-        console.log(`[AfkBot] Moving to (${pos.x}, ${pos.y}, ${pos.z})`);
-        bot.pathfinder.setGoal(new GoalBlock(pos.x, pos.y, pos.z));
+        bot.pathfinder.setGoal(new GoalBlock(pos.x + offset, pos.y, pos.z + offset));
       }
 
       bot.setControlState('forward', true);
@@ -167,79 +178,74 @@ function createBot() {
     });
 
     bot.on('chat', (username, message) => {
-      if (message === 'quit' && !reconnecting) {
-        reconnecting = true;
-        quitting = true;
-        console.log('[INFO] Quit command received. Quitting...');
+      if (message === 'quit' && !reconnecting[index]) {
+        reconnecting[index] = true;
+        quitting[index] = true;
+        console.log(`[Bot${index}] Quit command received.`);
         bot.quit();
       }
     });
-    bot.dig = async () => {
-      return Promise.reject(new Error('Digging is disabled'));
-    };
-
-    bot.placeBlock = async () => {
-      return Promise.reject(new Error('Placing blocks is disabled'));
-    };
 
     bot.on('goal_reached', () => {
-      console.log(`[AfkBot] Reached destination: ${bot.entity.position}`);
+      console.log(`[Bot${index}] Reached destination: ${bot.entity.position}`);
     });
 
     bot.on('death', () => {
-      console.log(`[AfkBot] Bot died. Respawned at: ${bot.entity.position}`);
+      console.log(`[Bot${index}] Bot died. Respawned at: ${bot.entity.position}`);
     });
 
-    if (config.utils['auto-reconnect']) {
-      bot.on('end', () => {
-        botleft = Date.now();
-        if (!realPlayerDetected) {
-          botjoining = false;
-          setTimeout(() => {
-            console.log('[INFO] Attempting bot reconnect...');
-            createBot();
-          }, 20000);
-        }
-      });
-    }
+    bot.on('end', () => {
+      botleft[index] = Date.now();
+      if (!realPlayerDetected && !quitting[index]) {
+        botJoining[index] = false;
+        setTimeout(() => {
+          console.log(`[Bot${index}] Attempting to reconnect...`);
+          createBot(index);
+        }, 20000);
+      }
+    });
 
     bot.on('kicked', reason => {
-      console.log(`[AfkBot] Bot was kicked. Reason: ${reason}`);
+      console.log(`[Bot${index}] Kicked: ${reason}`);
     });
-    
+
     bot.on('error', err => {
-      console.error(`[ERROR] ${err.message}`);
+      console.error(`[Bot${index}] ERROR: ${err.message}`);
     });
+
+    // Disable digging and placing
+    bot.dig = async () => Promise.reject(new Error('Digging is disabled'));
+    bot.placeBlock = async () => Promise.reject(new Error('Placing blocks is disabled'));
+
+    // Stuck detection
+    let lastPosition = null;
+    let samePositionSince = null;
+
+    setInterval(() => {
+      if (!bot || !bot.entity || !bot.entity.position) return;
+      const currentPos = bot.entity.position;
+      if (!lastPosition) {
+        lastPosition = currentPos.clone();
+        samePositionSince = Date.now();
+        return;
+      }
+      const dist = currentPos.distanceTo(lastPosition);
+      if (dist < 0.1) {
+        const stuckDuration = (Date.now() - samePositionSince) / 1000;
+        if (stuckDuration >= 10) {
+          console.log(`[Bot${index}] STUCK detected. Executing /kill.`);
+          bot.chat('/kill');
+          samePositionSince = Date.now();
+        }
+      } else {
+        lastPosition = currentPos.clone();
+        samePositionSince = Date.now();
+      }
+    }, 1000);
   } catch (err) {
-    console.error(`[Bot Creation Error] ${err.message}`);
+    console.error(`[Bot Creation Error ${index}] ${err.message}`);
   }
 }
 
 setInterval(checkPlayers, 2000);
 checkPlayers();
-
-let lastPosition = null;
-let samePositionSince = null;
-
-setInterval(() => {
-  if (!BOT || !BOT.entity || !BOT.entity.position) return;
-  const currentPos = BOT.entity.position;
-  if (!lastPosition) {
-    lastPosition = currentPos.clone();
-    samePositionSince = Date.now();
-    return;
-  }
-  const dist = currentPos.distanceTo(lastPosition);
-  if (dist < 0.1) {
-    const stuckDuration = (Date.now() - samePositionSince) / 1000;
-    if (stuckDuration >= 10) {
-      console.log('[STUCK DETECTED] Bot is stuck for more than 10 seconds.');
-      BOT.chat('/kill');
-      samePositionSince = Date.now();
-    }
-  } else {
-    lastPosition = currentPos.clone();
-    samePositionSince = Date.now();
-  }
-}, 1000);
-
