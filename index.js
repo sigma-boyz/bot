@@ -44,8 +44,8 @@ function checkPlayers() {
         console.log('[INFO] No players online. Starting bots...');
         botJoining = [true, true];
         realPlayerDetected = false;
-        setTimeout(() => createBot(0), 5000);
-        setTimeout(() => createBot(1), 10000);
+        setTimeout(() => createBot("john"), 5000);
+        setTimeout(() => createBot("max"), 10000);
       }
 
       if (bots.some(b => b)) console.log('[INFO] Bots are active.');
@@ -59,7 +59,7 @@ function checkPlayers() {
 
 function createBot(index) {
   try {
-    const botUsername = config["bot-account"].username + (index + 1);
+    const botUsername = index
     const bot = mineflayer.createBot({
       username: botUsername,
       password: config["bot-account"].password || undefined,
