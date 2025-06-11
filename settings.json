@@ -36,12 +36,14 @@
     },
 
     "chat-messages": {
-      "enabled": false,
+      "enabled": true,
       "repeat": false,
       "repeat-delay": 60,
 
       "messages": [
-        
+        "yoo",
+        "whats up",
+        "no one online??"
       ]
     },
 
