@@ -37,8 +37,8 @@
 
     "chat-messages": {
       "enabled": true,
-      "repeat": false,
-      "repeat-delay": 60,
+      "repeat": true,
+      "repeat-delay": 120,
 
       "messages": [
         "yoo",
