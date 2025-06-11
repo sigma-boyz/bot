@@ -170,7 +170,7 @@ function createBot(index,username) {
       if (!realPlayerDetected && !quitting[index] && config.utils["auto-reconnect"]) {
         setTimeout(() => {
           console.log(`[Bot${index + 1}] Attempting reconnect...`);
-          createBot(index);
+          createBot(index, index === 0 ? "john" : "max");
         }, config.utils["auto-reconnect-delay"] || 10000);
       }
     });
