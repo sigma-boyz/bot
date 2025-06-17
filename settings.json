@@ -1,27 +1,21 @@
 {
   "bot-account": {
-    "username": "bot", 
+    "username": "bot",
     "password": "",
     "type": "mojang"
   },
-"movement-area": {
-  "enabled": true,
-  "center": { "x": 100, "y": 65, "z": 100 },
-  "range": 5,
-  "interval": 5
-},
+
+  "movement-area": {
+    "enabled": true,
+    "center": { "x": 100, "y": 65, "z": 100 },
+    "range": 5,
+    "interval": 5
+  },
 
   "server": {
-    "ip": "Sigma-boyz.aternos.me", 
-    "port": 37216,   
-    "version": "1.12.1"   
-  },
-  
-  "position": {
-    "enabled": false,
-    "x": 0,
-    "y": 0,
-    "z": 0
+    "ip": "Sigma-boyz.aternos.me",
+    "port": 37216,
+    "version": "1.12.1"
   },
 
   "utils": {
@@ -39,16 +33,15 @@
       "enabled": true,
       "repeat": true,
       "repeat-delay": 120,
-
       "messages": [
-        "yoo",
-        "whats up",
-        "no one online??"
+        "Hey there!",
+        "Still here ",
+        "Anyone online?"
       ]
     },
 
     "chat-log": true,
     "auto-reconnect": true,
-    "auto-reconnect-delay": 5000
+    "auto-reconnect-delay": 10000
   }
 }
