@@ -69,6 +69,8 @@ function createBot(index, username) {
 
     bot.loadPlugin(pathfinder);
 
+    let intervals = [];
+
     bot.once('spawn', () => {
       console.log(`\x1b[33m[Bot${index + 1}] Joined the server\x1b[0m`);
       botleft[index] = 0;
@@ -78,15 +80,23 @@ function createBot(index, username) {
       bot.setControlState('forward', true);
       bot.setControlState('jump', true);
 
-      setInterval(() => {
-        const yaw = Math.random() * Math.PI * 2;
-        const pitch = (Math.random() - 0.5) * Math.PI;
-        bot.look(yaw, pitch, true);
-      }, 5000);
+      intervals.push(setInterval(() => {
+        try {
+          const yaw = Math.random() * Math.PI * 2;
+          const pitch = (Math.random() - 0.5) * Math.PI;
+          bot.look(yaw, pitch, true);
+        } catch (err) {
+          console.error(`[Bot${index + 1}] Look error: ${err.message}`);
+        }
+      }, 5000));
 
-      setInterval(() => {
-        bot.setQuickBarSlot(Math.floor(Math.random() * 9));
-      }, 7000);
+      intervals.push(setInterval(() => {
+        try {
+          bot.setQuickBarSlot(Math.floor(Math.random() * 9));
+        } catch (err) {
+          console.error(`[Bot${index + 1}] Hotbar error: ${err.message}`);
+        }
+      }, 7000));
 
       if (config["movement-area"].enabled) {
         const area = config["movement-area"];
@@ -110,7 +120,7 @@ function createBot(index, username) {
           const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
           const y = getSafeY(x, z);
           bot.pathfinder.setGoal(new GoalBlock(x, y, z));
-          setTimeout(moveRandom, interval);
+          intervals.push(setTimeout(moveRandom, interval));
         };
 
         moveRandom();
@@ -121,12 +131,22 @@ function createBot(index, username) {
         if (config.utils["chat-messages"].repeat) {
           const delay = config.utils["chat-messages"]["repeat-delay"] * 1000;
           let i = 0;
-          setInterval(() => {
-            bot.chat(messages[i]);
-            i = (i + 1) % messages.length;
-          }, delay);
+          intervals.push(setInterval(() => {
+            try {
+              if (bot.chat && bot.player && bot._client?.chat) {
+                bot.chat(messages[i]);
+                i = (i + 1) % messages.length;
+              }
+            } catch (err) {
+              console.error(`[Bot${index + 1}] Chat error: ${err.message}`);
+            }
+          }, delay));
         } else {
-          messages.forEach(msg => bot.chat(msg));
+          messages.forEach(msg => {
+            if (bot.chat && bot.player && bot._client?.chat) {
+              bot.chat(msg);
+            }
+          });
         }
       }
 
@@ -137,6 +157,34 @@ function createBot(index, username) {
           }
         });
       }
+
+      let lastPos = null;
+      let stillSince = null;
+
+      intervals.push(setInterval(() => {
+        try {
+          if (!bot.entity || !bot.entity.position) return;
+          const pos = bot.entity.position;
+          if (!lastPos) {
+            lastPos = pos.clone();
+            stillSince = Date.now();
+            return;
+          }
+          const dist = pos.distanceTo(lastPos);
+          if (dist < 0.1) {
+            if (Date.now() - stillSince >= 10000) {
+              console.log(`[Bot${index + 1}] Stuck. Using /kill`);
+              if (bot.chat && bot._client?.chat) bot.chat('/kill');
+              stillSince = Date.now();
+            }
+          } else {
+            lastPos = pos.clone();
+            stillSince = Date.now();
+          }
+        } catch (err) {
+          console.error(`[Bot${index + 1}] Stuck detection error: ${err.message}`);
+        }
+      }, 1000));
     });
 
     bot.on('chat', (username, message) => {
@@ -153,6 +201,8 @@ function createBot(index, username) {
 
     bot.on('end', () => {
       botleft[index] = Date.now();
+      console.log(`[Bot${index + 1}] Disconnected.`);
+      intervals.forEach(clearInterval);
       if (!realPlayerDetected && !quitting[index] && config.utils["auto-reconnect"]) {
         setTimeout(() => {
           console.log(`[Bot${index + 1}] Attempting reconnect...`);
@@ -166,7 +216,9 @@ function createBot(index, username) {
       const otherIndex = index === 0 ? 1 : 0;
       if (bots[otherIndex]) {
         setTimeout(() => {
-          bots[otherIndex].chat(`/pardon ${username}`);
+          if (bots[otherIndex]?.chat && bots[otherIndex]._client?.chat) {
+            bots[otherIndex].chat(`/pardon ${username}`);
+          }
         }, 10000);
       }
     });
@@ -178,29 +230,6 @@ function createBot(index, username) {
     bot.dig = async () => Promise.reject(new Error('Digging is disabled'));
     bot.placeBlock = async () => Promise.reject(new Error('Placing is disabled'));
 
-    let lastPos = null;
-    let stillSince = null;
-
-    setInterval(() => {
-      if (!bot.entity || !bot.entity.position) return;
-      const pos = bot.entity.position;
-      if (!lastPos) {
-        lastPos = pos.clone();
-        stillSince = Date.now();
-        return;
-      }
-      const dist = pos.distanceTo(lastPos);
-      if (dist < 0.1) {
-        if (Date.now() - stillSince >= 10000) {
-          console.log(`[Bot${index + 1}] Stuck. Using /kill`);
-          bot.chat('/kill');
-          stillSince = Date.now();
-        }
-      } else {
-        lastPos = pos.clone();
-        stillSince = Date.now();
-      }
-    }, 1000);
   } catch (err) {
     console.error(`[Bot Creation Error ${index}] ${err.message}`);
   }
