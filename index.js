@@ -44,7 +44,7 @@ function checkPlayers() {
       botJoining = [true, true];
       realPlayerDetected = false;
       setTimeout(() => createBot(0, "john"), 5000);
-      setTimeout(() => createBot(1, "max"), 10000);
+      setTimeout(() => createBot(1, "max"), 15000);
     }
   }).catch(err => {
     console.error('Status check error:', err.message);
@@ -69,85 +69,83 @@ function createBot(index, username) {
 
     bot.loadPlugin(pathfinder);
 
-    let intervals = [];
-
     bot.once('spawn', () => {
       console.log(`\x1b[33m[Bot${index + 1}] Joined the server\x1b[0m`);
       botleft[index] = 0;
 
-      if (config.utils["anti-afk"].enabled && config.utils["anti-afk"].sneak)
-        bot.setControlState('sneak', true);
-      bot.setControlState('forward', true);
-      bot.setControlState('jump', true);
+      const mcData = require('minecraft-data')(bot.version);
+      const movements = new Movements(bot, mcData);
+      bot.pathfinder.setMovements(movements);
 
-      intervals.push(setInterval(() => {
-        try {
-          const yaw = Math.random() * Math.PI * 2;
-          const pitch = (Math.random() - 0.5) * Math.PI;
-          bot.look(yaw, pitch, true);
-        } catch (err) {
-          console.error(`[Bot${index + 1}] Look error: ${err.message}`);
+      const center = config["movement-area"].center;
+      const range = config["movement-area"].range;
+      const moveInterval = config["movement-area"].interval * 1000;
+
+      const getSafeY = (x, z) => {
+        for (let y = 255; y > 0; y--) {
+          const block = bot.blockAt(new Vec3(x, y, z));
+          if (block && block.boundingBox !== 'empty') return y + 1;
         }
-      }, 5000));
+        return center.y;
+      };
 
-      intervals.push(setInterval(() => {
-        try {
-          bot.setQuickBarSlot(Math.floor(Math.random() * 9));
-        } catch (err) {
-          console.error(`[Bot${index + 1}] Hotbar error: ${err.message}`);
-        }
-      }, 7000));
+      const moveRandom = () => {
+        if (!bot.entity) return;
+        const x = center.x + Math.floor((Math.random() - 0.5) * range * 2);
+        const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
+        const y = getSafeY(x, z);
+        bot.pathfinder.setGoal(new GoalBlock(x, y, z));
+        const nextMoveDelay = moveInterval + Math.floor(Math.random() * 5000);
+        setTimeout(moveRandom, nextMoveDelay);
+      };
 
-      if (config["movement-area"].enabled) {
-        const area = config["movement-area"];
-        const center = area.center;
-        const range = area.range;
-        const interval = area.interval * 1000;
-        const mcData = require('minecraft-data')(bot.version);
-        const defaultMove = new Movements(bot, mcData);
-        bot.pathfinder.setMovements(defaultMove);
+      if (config["movement-area"].enabled) moveRandom();
 
-        const getSafeY = (x, z) => {
-          for (let y = 256; y > 0; y--) {
-            const block = bot.blockAt(new Vec3(x, y, z));
-            if (block && block.boundingBox !== 'empty') return y + 1;
-          }
-          return center.y;
-        };
+      setInterval(() => {
+        const yaw = Math.random() * Math.PI * 2;
+        const pitch = (Math.random() - 0.5) * Math.PI / 2;
+        bot.look(yaw, pitch, true);
+      }, 4000 + Math.random() * 3000);
 
-        const moveRandom = () => {
-          const x = center.x + Math.floor((Math.random() - 0.5) * range * 2);
-          const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
-          const y = getSafeY(x, z);
-          bot.pathfinder.setGoal(new GoalBlock(x, y, z));
-          intervals.push(setTimeout(moveRandom, interval));
-        };
+      setInterval(() => {
+        const slot = Math.floor(Math.random() * 9);
+        bot.setQuickBarSlot(slot);
+      }, 8000 + Math.random() * 4000);
 
-        moveRandom();
+      setInterval(() => {
+        const actions = ['sneak', 'jump', 'sprint', 'none'];
+        const action = actions[Math.floor(Math.random() * actions.length)];
+        bot.setControlState('sneak', action === 'sneak');
+        bot.setControlState('jump', action === 'jump');
+        bot.setControlState('sprint', action === 'sprint');
+        setTimeout(() => {
+          bot.clearControlStates();
+        }, 1000 + Math.random() * 2000);
+      }, 10000 + Math.random() * 10000);
+
+      if (config.utils["anti-afk"].enabled) {
+        bot.setControlState('forward', true);
       }
 
       if (config.utils["chat-messages"].enabled) {
         const messages = config.utils["chat-messages"].messages;
-        if (config.utils["chat-messages"].repeat) {
-          const delay = config.utils["chat-messages"]["repeat-delay"] * 1000;
-          let i = 0;
-          intervals.push(setInterval(() => {
-            try {
-              if (bot.chat && bot.player && bot._client?.chat) {
-                bot.chat(messages[i]);
-                i = (i + 1) % messages.length;
-              }
-            } catch (err) {
-              console.error(`[Bot${index + 1}] Chat error: ${err.message}`);
+        const delay = config.utils["chat-messages"]["repeat-delay"] * 1000;
+        let i = 0;
+        setInterval(() => {
+          const msg = messages[i];
+          const chars = msg.split('');
+          let current = '';
+          const typeMsg = () => {
+            if (chars.length === 0) {
+              bot.chat(current);
+              return;
             }
-          }, delay));
-        } else {
-          messages.forEach(msg => {
-            if (bot.chat && bot.player && bot._client?.chat) {
-              bot.chat(msg);
-            }
-          });
-        }
+            current += chars.shift();
+            setTimeout(typeMsg, 50 + Math.random() * 100);
+          };
+          typeMsg();
+          i = (i + 1) % messages.length;
+        }, delay);
       }
 
       if (config.utils["chat-log"]) {
@@ -157,34 +155,6 @@ function createBot(index, username) {
           }
         });
       }
-
-      let lastPos = null;
-      let stillSince = null;
-
-      intervals.push(setInterval(() => {
-        try {
-          if (!bot.entity || !bot.entity.position) return;
-          const pos = bot.entity.position;
-          if (!lastPos) {
-            lastPos = pos.clone();
-            stillSince = Date.now();
-            return;
-          }
-          const dist = pos.distanceTo(lastPos);
-          if (dist < 0.1) {
-            if (Date.now() - stillSince >= 10000) {
-              console.log(`[Bot${index + 1}] Stuck. Using /kill`);
-              if (bot.chat && bot._client?.chat) bot.chat('/kill');
-              stillSince = Date.now();
-            }
-          } else {
-            lastPos = pos.clone();
-            stillSince = Date.now();
-          }
-        } catch (err) {
-          console.error(`[Bot${index + 1}] Stuck detection error: ${err.message}`);
-        }
-      }, 1000));
     });
 
     bot.on('chat', (username, message) => {
@@ -201,26 +171,15 @@ function createBot(index, username) {
 
     bot.on('end', () => {
       botleft[index] = Date.now();
-      console.log(`[Bot${index + 1}] Disconnected.`);
-      intervals.forEach(clearInterval);
       if (!realPlayerDetected && !quitting[index] && config.utils["auto-reconnect"]) {
-        setTimeout(() => {
-          console.log(`[Bot${index + 1}] Attempting reconnect...`);
-          createBot(index, index === 0 ? "john" : "max");
-        }, config.utils["auto-reconnect-delay"] || 10000);
+        const delay = (config.utils["auto-reconnect-delay"] || 60000) + index * 20000;
+        console.log(`[Bot${index + 1}] Reconnecting in ${delay / 1000}s...`);
+        setTimeout(() => createBot(index, index === 0 ? "john" : "max"), delay);
       }
     });
 
     bot.on('kicked', reason => {
       console.log(`[Bot${index + 1}] Kicked: ${reason}`);
-      const otherIndex = index === 0 ? 1 : 0;
-      if (bots[otherIndex]) {
-        setTimeout(() => {
-          if (bots[otherIndex]?.chat && bots[otherIndex]._client?.chat) {
-            bots[otherIndex].chat(`/pardon ${username}`);
-          }
-        }, 10000);
-      }
     });
 
     bot.on('error', err => {
@@ -229,6 +188,28 @@ function createBot(index, username) {
 
     bot.dig = async () => Promise.reject(new Error('Digging is disabled'));
     bot.placeBlock = async () => Promise.reject(new Error('Placing is disabled'));
+
+    let lastPos = null;
+    let stillSince = null;
+    setInterval(() => {
+      if (!bot.entity) return;
+      const pos = bot.entity.position;
+      if (!lastPos) {
+        lastPos = pos.clone();
+        stillSince = Date.now();
+        return;
+      }
+      if (pos.distanceTo(lastPos) < 0.1) {
+        if (Date.now() - stillSince > 15000) {
+          console.log(`[Bot${index + 1}] Appears stuck. Executing /kill`);
+          bot.chat('/kill');
+          stillSince = Date.now();
+        }
+      } else {
+        lastPos = pos.clone();
+        stillSince = Date.now();
+      }
+    }, 2000);
 
   } catch (err) {
     console.error(`[Bot Creation Error ${index}] ${err.message}`);
