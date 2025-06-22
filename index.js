@@ -86,7 +86,7 @@ function createBot(index, username) {
           const block = bot.blockAt(new Vec3(x, y, z));
           if (block && block.boundingBox !== 'empty') return y + 1;
         }
-        return center.y;
+        return null; // return null if no solid block found
       };
 
       const moveRandom = () => {
@@ -94,12 +94,22 @@ function createBot(index, username) {
         const x = center.x + Math.floor((Math.random() - 0.5) * range * 2);
         const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
         const y = getSafeY(x, z);
+
+        if (y === null) {
+          console.warn(`[Bot${index + 1}] No safe Y found at (${x}, ?, ${z}) — skipping movement.`);
+          setTimeout(moveRandom, moveInterval + Math.floor(Math.random() * 5000));
+          return;
+        }
+
         bot.pathfinder.setGoal(new GoalBlock(x, y, z));
         const nextMoveDelay = moveInterval + Math.floor(Math.random() * 5000);
         setTimeout(moveRandom, nextMoveDelay);
       };
 
-      if (config["movement-area"].enabled) moveRandom();
+      // Start movement after short delay to allow chunk loading
+      if (config["movement-area"].enabled) {
+        setTimeout(() => moveRandom(), 5000);
+      }
 
       setInterval(() => {
         const yaw = Math.random() * Math.PI * 2;
