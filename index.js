@@ -86,7 +86,7 @@ function createBot(index, username) {
           const block = bot.blockAt(new Vec3(x, y, z));
           if (block && block.boundingBox !== 'empty') return y + 1;
         }
-        return null; // return null if no solid block found
+        return null;
       };
 
       const moveRandom = () => {
@@ -106,7 +106,6 @@ function createBot(index, username) {
         setTimeout(moveRandom, nextMoveDelay);
       };
 
-      // Start movement after short delay to allow chunk loading
       if (config["movement-area"].enabled) {
         setTimeout(() => moveRandom(), 5000);
       }
@@ -165,6 +164,34 @@ function createBot(index, username) {
           }
         });
       }
+
+      // === Improved Stuck Detection ===
+      let lastPos = null;
+      let stillSince = null;
+      setInterval(() => {
+        if (!bot.entity) return;
+
+        const pos = bot.entity.position.clone();
+        const isMoving = bot.pathfinder.isMoving();
+
+        if (!lastPos) {
+          lastPos = pos;
+          stillSince = Date.now();
+          return;
+        }
+
+        if (pos.distanceTo(lastPos) < 0.1) {
+          if (isMoving && Date.now() - stillSince > 30000) {
+            console.log(`[Bot${index + 1}] Stuck for too long. Executing /kill`);
+            bot.chat('/kill');
+            stillSince = Date.now();
+          }
+        } else {
+          lastPos = pos;
+          stillSince = Date.now();
+        }
+      }, 5000); // Check every 5 seconds
+
     });
 
     bot.on('chat', (username, message) => {
@@ -196,30 +223,9 @@ function createBot(index, username) {
       console.error(`[Bot${index + 1}] Error: ${err.message}`);
     });
 
+    // Prevent digging/placing
     bot.dig = async () => Promise.reject(new Error('Digging is disabled'));
     bot.placeBlock = async () => Promise.reject(new Error('Placing is disabled'));
-
-    let lastPos = null;
-    let stillSince = null;
-    setInterval(() => {
-      if (!bot.entity) return;
-      const pos = bot.entity.position;
-      if (!lastPos) {
-        lastPos = pos.clone();
-        stillSince = Date.now();
-        return;
-      }
-      if (pos.distanceTo(lastPos) < 0.1) {
-        if (Date.now() - stillSince > 15000) {
-          console.log(`[Bot${index + 1}] Appears stuck. Executing /kill`);
-          bot.chat('/kill');
-          stillSince = Date.now();
-        }
-      } else {
-        lastPos = pos.clone();
-        stillSince = Date.now();
-      }
-    }, 2000);
 
   } catch (err) {
     console.error(`[Bot Creation Error ${index}] ${err.message}`);
