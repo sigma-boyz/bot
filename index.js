@@ -6,231 +6,230 @@ const express = require('express');
 const config = require('./settings.json');
 
 const app = express();
-const host = config.server.ip;
-const port = config.server.port;
-
 app.get('/', (_, res) => res.send('Bots running'));
 app.listen(8000, () => console.log('Web server started on port 8000'));
 
-let bots = [null, null];
-let botJoining = [false, false];
-let reconnecting = [false, false];
-let quitting = [false, false];
-let botleft = [0, 0];
-let realPlayerDetected = false;
+// === SERVER CONFIGURATION (Only IP/Port here) ===
+const servers = [
+  { ip: 'Sigma-Sigma-boyz.aternos.me', port: 37216 },
+  { ip: 'manhunt-6juW.aternos.me', port: 56527 }
+];
 
-function checkPlayers() {
-  if (botJoining.includes(true)) return;
+// === State Tracking ===
+let bots = [[], []]; // bots[0] = server 1 bots, bots[1] = server 2 bots
+let botJoining = [[false, false], [false, false]];
+let reconnecting = [[false, false], [false, false]];
+let quitting = [[false, false], [false, false]];
+let realPlayerDetected = [false, false];
 
-  status(host, port, { timeout: 5000, enableSRV: true }).then(response => {
+// === Player Checker ===
+function checkPlayers(serverIndex) {
+  const server = servers[serverIndex];
+  if (botJoining[serverIndex].some(j => j)) return;
+
+  status(server.ip, server.port, { timeout: 5000, enableSRV: true }).then(response => {
     const online = response.players.online;
-    console.log(`[${new Date().toLocaleTimeString()}] Players Online: ${online}`);
+    console.log(`[${new Date().toLocaleTimeString()}] [Server${serverIndex + 1}] Players Online: ${online}`);
 
-    if (online > 2) realPlayerDetected = true;
+    if (online > 2) realPlayerDetected[serverIndex] = true;
 
-    if (bots.some(b => b) && realPlayerDetected && online === 3) {
-      console.log('[INFO] Real player joined. Quitting all bots...');
-      bots.forEach((bot, i) => {
+    if (bots[serverIndex].some(b => b) && realPlayerDetected[serverIndex] && online === 3) {
+      console.log(`[Server${serverIndex + 1}] Real player joined. Quitting bots...`);
+      bots[serverIndex].forEach((bot, i) => {
         if (bot) {
           bot.quit();
-          bots[i] = null;
+          bots[serverIndex][i] = null;
         }
       });
       return;
     }
 
-    if (bots.every(b => b === null) && online === 0) {
-      console.log('[INFO] No players online. Starting bots...');
-      botJoining = [true, true];
-      realPlayerDetected = false;
-      setTimeout(() => createBot(0, "john"), 5000);
-      setTimeout(() => createBot(1, "max"), 15000);
+    if (bots[serverIndex].every(b => b === null || b === undefined) && online === 0) {
+      console.log(`[Server${serverIndex + 1}] No players online. Starting bots...`);
+      realPlayerDetected[serverIndex] = false;
+      botJoining[serverIndex] = [true, true];
+
+      setTimeout(() => createBot(serverIndex, 0, "john"), 5000);
+      setTimeout(() => createBot(serverIndex, 1, "max"), 15000);
     }
   }).catch(err => {
-    console.error('Status check error:', err.message);
+    console.error(`[Server${serverIndex + 1}] Status error:`, err.message);
   });
 }
 
-function createBot(index, username) {
-  try {
-    const bot = mineflayer.createBot({
-      username,
-      password: config["bot-account"].password || undefined,
-      auth: config["bot-account"].type || 'mojang',
-      host,
-      port,
-      version: config.server.version
-    });
+// === Bot Creation ===
+function createBot(serverIndex, botIndex, username) {
+  const server = servers[serverIndex];
 
-    bots[index] = bot;
-    botJoining[index] = false;
-    reconnecting[index] = false;
-    quitting[index] = false;
+  const bot = mineflayer.createBot({
+    username,
+    password: config["bot-account"].password || undefined,
+    auth: config["bot-account"].type || 'mojang',
+    host: server.ip,
+    port: server.port,
+    version: config.server.version
+  });
 
-    bot.loadPlugin(pathfinder);
+  bots[serverIndex][botIndex] = bot;
+  botJoining[serverIndex][botIndex] = false;
+  reconnecting[serverIndex][botIndex] = false;
+  quitting[serverIndex][botIndex] = false;
 
-    bot.once('spawn', () => {
-      console.log(`\x1b[33m[Bot${index + 1}] Joined the server\x1b[0m`);
-      botleft[index] = 0;
+  bot.loadPlugin(pathfinder);
 
-      const mcData = require('minecraft-data')(bot.version);
-      const movements = new Movements(bot, mcData);
-      bot.pathfinder.setMovements(movements);
+  bot.once('spawn', () => {
+    console.log(`[Server${serverIndex + 1}][Bot${botIndex + 1}] Joined as ${username}`);
 
-      const center = config["movement-area"].center;
-      const range = config["movement-area"].range;
-      const moveInterval = config["movement-area"].interval * 1000;
+    const mcData = require('minecraft-data')(bot.version);
+    const movements = new Movements(bot, mcData);
+    bot.pathfinder.setMovements(movements);
 
-      const getSafeY = (x, z) => {
-        for (let y = 255; y > 0; y--) {
-          const block = bot.blockAt(new Vec3(x, y, z));
-          if (block && block.boundingBox !== 'empty') return y + 1;
-        }
-        return null;
-      };
+    const center = config["movement-area"].center;
+    const range = config["movement-area"].range;
+    const moveInterval = config["movement-area"].interval * 1000;
 
-      const moveRandom = () => {
-        if (!bot.entity) return;
-        const x = center.x + Math.floor((Math.random() - 0.5) * range * 2);
-        const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
-        const y = getSafeY(x, z);
+    const getSafeY = (x, z) => {
+      for (let y = 255; y > 0; y--) {
+        const block = bot.blockAt(new Vec3(x, y, z));
+        if (block && block.boundingBox !== 'empty') return y + 1;
+      }
+      return null;
+    };
 
-        if (y === null) {
-          console.warn(`[Bot${index + 1}] No safe Y found at (${x}, ?, ${z}) — skipping movement.`);
-          setTimeout(moveRandom, moveInterval + Math.floor(Math.random() * 5000));
-          return;
-        }
+    const moveRandom = () => {
+      if (!bot.entity) return;
+      const x = center.x + Math.floor((Math.random() - 0.5) * range * 2);
+      const z = center.z + Math.floor((Math.random() - 0.5) * range * 2);
+      const y = getSafeY(x, z);
 
-        bot.pathfinder.setGoal(new GoalBlock(x, y, z));
-        const nextMoveDelay = moveInterval + Math.floor(Math.random() * 5000);
-        setTimeout(moveRandom, nextMoveDelay);
-      };
-
-      if (config["movement-area"].enabled) {
-        setTimeout(() => moveRandom(), 5000);
+      if (y === null) {
+        console.warn(`[Bot${username}] No safe Y found at (${x}, ?, ${z})`);
+        return setTimeout(moveRandom, moveInterval + Math.random() * 5000);
       }
 
+      bot.pathfinder.setGoal(new GoalBlock(x, y, z));
+      setTimeout(moveRandom, moveInterval + Math.random() * 5000);
+    };
+
+    if (config["movement-area"].enabled) setTimeout(() => moveRandom(), 5000);
+
+    setInterval(() => {
+      const yaw = Math.random() * Math.PI * 2;
+      const pitch = (Math.random() - 0.5) * Math.PI / 2;
+      bot.look(yaw, pitch, true);
+    }, 4000 + Math.random() * 3000);
+
+    setInterval(() => {
+      const slot = Math.floor(Math.random() * 9);
+      bot.setQuickBarSlot(slot);
+    }, 8000 + Math.random() * 4000);
+
+    setInterval(() => {
+      const actions = ['sneak', 'jump', 'sprint', 'none'];
+      const action = actions[Math.floor(Math.random() * actions.length)];
+      bot.setControlState('sneak', action === 'sneak');
+      bot.setControlState('jump', action === 'jump');
+      bot.setControlState('sprint', action === 'sprint');
+      setTimeout(() => bot.clearControlStates(), 1000 + Math.random() * 2000);
+    }, 10000 + Math.random() * 10000);
+
+    if (config.utils["anti-afk"].enabled) {
+      bot.setControlState('forward', true);
+    }
+
+    if (config.utils["chat-messages"].enabled) {
+      const messages = config.utils["chat-messages"].messages;
+      const delay = config.utils["chat-messages"]["repeat-delay"] * 1000;
+      let i = 0;
       setInterval(() => {
-        const yaw = Math.random() * Math.PI * 2;
-        const pitch = (Math.random() - 0.5) * Math.PI / 2;
-        bot.look(yaw, pitch, true);
-      }, 4000 + Math.random() * 3000);
-
-      setInterval(() => {
-        const slot = Math.floor(Math.random() * 9);
-        bot.setQuickBarSlot(slot);
-      }, 8000 + Math.random() * 4000);
-
-      setInterval(() => {
-        const actions = ['sneak', 'jump', 'sprint', 'none'];
-        const action = actions[Math.floor(Math.random() * actions.length)];
-        bot.setControlState('sneak', action === 'sneak');
-        bot.setControlState('jump', action === 'jump');
-        bot.setControlState('sprint', action === 'sprint');
-        setTimeout(() => {
-          bot.clearControlStates();
-        }, 1000 + Math.random() * 2000);
-      }, 10000 + Math.random() * 10000);
-
-      if (config.utils["anti-afk"].enabled) {
-        bot.setControlState('forward', true);
-      }
-
-      if (config.utils["chat-messages"].enabled) {
-        const messages = config.utils["chat-messages"].messages;
-        const delay = config.utils["chat-messages"]["repeat-delay"] * 1000;
-        let i = 0;
-        setInterval(() => {
-          const msg = messages[i];
-          const chars = msg.split('');
-          let current = '';
-          const typeMsg = () => {
-            if (chars.length === 0) {
-              bot.chat(current);
-              return;
-            }
-            current += chars.shift();
-            setTimeout(typeMsg, 50 + Math.random() * 100);
-          };
-          typeMsg();
-          i = (i + 1) % messages.length;
-        }, delay);
-      }
-
-      if (config.utils["chat-log"]) {
-        bot.on('chat', (username, message) => {
-          if (username !== bot.username) {
-            console.log(`[Chat][${username}] ${message}`);
+        const msg = messages[i];
+        let current = '';
+        const chars = msg.split('');
+        const typeMsg = () => {
+          if (chars.length === 0) {
+            bot.chat(current);
+            return;
           }
-        });
+          current += chars.shift();
+          setTimeout(typeMsg, 50 + Math.random() * 100);
+        };
+        typeMsg();
+        i = (i + 1) % messages.length;
+      }, delay);
+    }
+
+    if (config.utils["chat-log"]) {
+      bot.on('chat', (username, message) => {
+        if (username !== bot.username) {
+          console.log(`[Chat][${username}] ${message}`);
+        }
+      });
+    }
+
+    // === Stuck Detection ===
+    let lastPos = null;
+    let stillSince = null;
+    setInterval(() => {
+      if (!bot.entity) return;
+
+      const pos = bot.entity.position.clone();
+      const isMoving = bot.pathfinder.isMoving();
+
+      if (!lastPos) {
+        lastPos = pos;
+        stillSince = Date.now();
+        return;
       }
 
-      // === Improved Stuck Detection ===
-      let lastPos = null;
-      let stillSince = null;
-      setInterval(() => {
-        if (!bot.entity) return;
-
-        const pos = bot.entity.position.clone();
-        const isMoving = bot.pathfinder.isMoving();
-
-        if (!lastPos) {
-          lastPos = pos;
-          stillSince = Date.now();
-          return;
-        }
-
-        if (pos.distanceTo(lastPos) < 0.1) {
-          if (isMoving && Date.now() - stillSince > 30000) {
-            console.log(`[Bot${index + 1}] Stuck for too long. Executing /kill`);
-            bot.chat('/kill');
-            stillSince = Date.now();
-          }
-        } else {
-          lastPos = pos;
+      if (pos.distanceTo(lastPos) < 0.1) {
+        if (isMoving && Date.now() - stillSince > 30000) {
+          console.log(`[Bot${username}] Stuck. Executing /kill`);
+          bot.chat('/kill');
           stillSince = Date.now();
         }
-      }, 5000); // Check every 5 seconds
-
-    });
-
-    bot.on('chat', (username, message) => {
-      if (message === 'quit' && !reconnecting[index]) {
-        reconnecting[index] = true;
-        quitting[index] = true;
-        bot.quit();
+      } else {
+        lastPos = pos;
+        stillSince = Date.now();
       }
-    });
+    }, 5000);
+  });
 
-    bot.on('death', () => {
-      console.log(`[Bot${index + 1}] Died. Respawning...`);
-    });
+  bot.on('chat', (username, message) => {
+    if (message === 'quit' && !reconnecting[serverIndex][botIndex]) {
+      reconnecting[serverIndex][botIndex] = true;
+      quitting[serverIndex][botIndex] = true;
+      bot.quit();
+    }
+  });
 
-    bot.on('end', () => {
-      botleft[index] = Date.now();
-      if (!realPlayerDetected && !quitting[index] && config.utils["auto-reconnect"]) {
-        const delay = (config.utils["auto-reconnect-delay"] || 60000) + index * 20000;
-        console.log(`[Bot${index + 1}] Reconnecting in ${delay / 1000}s...`);
-        setTimeout(() => createBot(index, index === 0 ? "john" : "max"), delay);
-      }
-    });
+  bot.on('death', () => {
+    console.log(`[Bot${username}] Died. Respawning...`);
+  });
 
-    bot.on('kicked', reason => {
-      console.log(`[Bot${index + 1}] Kicked: ${reason}`);
-    });
+  bot.on('end', () => {
+    bots[serverIndex][botIndex] = null;
+    if (!realPlayerDetected[serverIndex] && !quitting[serverIndex][botIndex] && config.utils["auto-reconnect"]) {
+      const delay = (config.utils["auto-reconnect-delay"] || 60000) + botIndex * 20000;
+      console.log(`[Bot${username}] Reconnecting in ${delay / 1000}s...`);
+      setTimeout(() => createBot(serverIndex, botIndex, username), delay);
+    }
+  });
 
-    bot.on('error', err => {
-      console.error(`[Bot${index + 1}] Error: ${err.message}`);
-    });
+  bot.on('kicked', reason => {
+    console.log(`[Bot${username}] Kicked: ${reason}`);
+  });
 
-    // Prevent digging/placing
-    bot.dig = async () => Promise.reject(new Error('Digging is disabled'));
-    bot.placeBlock = async () => Promise.reject(new Error('Placing is disabled'));
+  bot.on('error', err => {
+    console.error(`[Bot${username}] Error: ${err.message}`);
+  });
 
-  } catch (err) {
-    console.error(`[Bot Creation Error ${index}] ${err.message}`);
-  }
+  // Prevent digging/placing
+  bot.dig = async () => Promise.reject(new Error('Digging disabled'));
+  bot.placeBlock = async () => Promise.reject(new Error('Placing disabled'));
 }
 
-setInterval(checkPlayers, 2000);
-checkPlayers();
+// === Start Monitoring Servers ===
+servers.forEach((_, i) => {
+  setInterval(() => checkPlayers(i), 2000);
+  checkPlayers(i);
+});
