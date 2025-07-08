@@ -11,7 +11,7 @@ app.listen(8000, () => console.log('Web server started on port 8000'));
 
 // === SERVER CONFIGURATION (Only IP/Port here) ===
 const servers = [
-  { ip: 'Sigma_Sigma_boyz.aternos.me', port: 37216 },
+  { ip: 'Sigma_Sigma_Boyz.aternos.me', port: 37216 },
   { ip: 'devario.aternos.host', port: 38054 }
 ];
 
