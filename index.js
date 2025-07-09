@@ -49,8 +49,8 @@ function checkPlayers(serverIndex) {
       realPlayerDetected[serverIndex] = false;
       botJoining[serverIndex] = [true, true];
 
-      setTimeout(() => createBot(serverIndex, 0, "sigma-bot"), 5000);
-      setTimeout(() => createBot(serverIndex, 1, "sigma-sigma-bot"), 15000);
+      setTimeout(() => createBot(serverIndex, 0, "john"), 5000);
+      setTimeout(() => createBot(serverIndex, 1, "max"), 15000);
     }
   }).catch(err => {
     console.error(`[Server${serverIndex + 1}] Status error:`, err.message);
